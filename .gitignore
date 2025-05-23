@@ -39,3 +39,18 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Tauri (Rust) build artifacts
+/src-tauri/target
+/src-tauri/.cargo
+/src-tauri/Cargo.lock
+
+# Tauri app build output
+/tauri-build
+/tauri-out
+
+# Compiled app executables
+*.app
+*.dmg
+*.exe
+*.msi
