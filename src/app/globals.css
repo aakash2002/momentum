@@ -118,4 +118,10 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  html, body {
+  background-color: #0f172a; /* same as your app bg */
+  color: white;
+  transition: background-color 0.3s ease;
+}
 }
