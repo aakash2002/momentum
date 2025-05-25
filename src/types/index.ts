@@ -5,6 +5,14 @@ export type Subtask = {
   category?: string
 }
 
+export type TaskCardProps = {
+  title: string;
+  category: string;
+  priority: 'Low' | 'Medium' | 'High';
+  estimatedMinutes: number;
+  subtasks: Subtask[];
+};
+
 export type Message = {
   id: string
   role: "user" | "assistant"
@@ -13,3 +21,9 @@ export type Message = {
   confirmed?: boolean
   editing?: boolean
 }
+
+export type TimerProps = {
+  showControls: boolean;
+  setShowControls: (value: boolean) => void;
+  estimatedMinutes: number;
+};

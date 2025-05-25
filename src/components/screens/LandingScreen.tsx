@@ -46,7 +46,7 @@ export default function LandingScreen({
     >
       <Card className="w-full max-w-xl bg-white/5 border border-white/10 shadow-xl">
         <CardContent className="space-y-6 py-10 text-center">
-          <h1 className="text-4xl font-extrabold text-white drop-shadow-md">
+          <h1 className="text-4xl font-extrabold text-white drop-shadow-md mt-8">
             Welcome, {name}!
           </h1>
 
@@ -73,10 +73,10 @@ export default function LandingScreen({
                 <Calendar className="w-4 h-4" /> Let's Plan the Day
               </Button>
             )}
-            <Button variant="outline" className="gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => router.push('/tasks')}>
               <RefreshCw className="w-4 h-4" /> Review Unfinished Tasks
             </Button>
-            <Button variant="outline" className="gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => alert('Feature coming soon!')}>
               <Pencil className="w-4 h-4" /> Reflect & Reset
             </Button>
           </div>
