@@ -21,9 +21,3 @@ export type Message = {
   confirmed?: boolean
   editing?: boolean
 }
-
-export type TimerProps = {
-  showControls: boolean;
-  setShowControls: (value: boolean) => void;
-  estimatedMinutes: number;
-};

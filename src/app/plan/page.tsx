@@ -12,9 +12,10 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 
 // User-Defined Imports
-import {Message, Subtask} from "@/types"
+import {Message, Subtask, TaskCardProps} from "@/types"
 import ChatMessage from "@/components/ChatMessage"
-import LandingScreen from '@/components/screens/LandingScreen';
+import { NextResponse } from "next/server"
+
 
 export default function AIBreakdown() {
     const [showChat, setShowChat] = useState(false)
@@ -41,52 +42,51 @@ export default function AIBreakdown() {
     alert("Regenerate feature coming soon")
   }
 
-  const handleSend = () => {
-    if (!text.trim()) return
+  const handleSend = async () => {
+  if (!text.trim()) return;
 
-    const userMessage: Message = {
-      id: nanoid(),
-      role: "user",
-      content: text.trim(),
+  const userMessage: Message = {
+    id: nanoid(),
+    role: "user",
+    content: text.trim()
+  };
+
+  setMessages((prev) => [...prev, userMessage]);
+  setText("");
+
+  try {
+    const res = await fetch("/api/breakdown", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userInput: text.trim() })
+    });
+
+    const data: { tasks: TaskCardProps[] } = await res.json();
+    console.log("AI Breakdown Response:", data);
+
+    if (!res.ok || !data.tasks) {
+      throw new Error("AI failed to return valid breakdown");
     }
 
-    const assistantMessage: Message = {
+    const assistantMessages: Message[] = data.tasks.map(task => ({
       id: nanoid(),
       role: "assistant",
-      content: "Sure! Here's a breakdown:",
+      content: `📌 ${task.title}`,
       confirmed: false,
       editing: false,
-      subtasks: [
-        {
-          title: "Define the scope of the feature",
-          estimate: 15,
-          status: "todo",
-          category: "planning"
-        },
-        {
-          title: "Design the UI layout",
-          estimate: 30,
-          status: "todo",
-          category: "design"
-        },
-        {
-          title: "Implement component logic",
-          estimate: 45,
-          status: "todo",
-          category: "development"
-        },
-        {
-          title: "Test interaction flow",
-          estimate: 20,
-          status: "todo",
-          category: "testing"
-        }
-      ]
-    }
+      subtasks: task.subtasks.map((subtask) => ({
+        ...subtask,
+        status: subtask.status as "todo" | "in_progress" | "done"
+      }))
+    }));
 
-    setMessages((prev) => [...prev, userMessage, assistantMessage])
-    setText("")
+    setMessages((prev) => [...prev, ...assistantMessages]);
+
+  } catch (err) {
+    console.error("Failed to get breakdown", err);
+    alert("Something went wrong generating tasks. Try again.");
   }
+};
 
 return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-gradient-to-br from-slate-900 to-gray-800 text-white overflow-hidden">
