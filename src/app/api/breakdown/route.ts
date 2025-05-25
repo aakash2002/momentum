@@ -29,8 +29,10 @@ export async function POST(req: Request) {
     body: JSON.stringify({
       contents: messages,
       generationConfig: {
-        temperature: 1,
-        maxOutputTokens: 4096
+        temperature: 0.4,
+        topK: 32,
+        topP: 1,
+        maxOutputTokens: 1024
       }
     })
   });

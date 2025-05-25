@@ -3,9 +3,29 @@
 - [ ] Authenticate with Supabase DB
 - [ ] Once logged in, see how to not prompt login every time unless user logged out. See if some local file needs to be saved or not.
 
-## AI Task Breakdown
-- [ ] Fix why Gemini 1.5 flash doesnt breakdown all tasks and skips first task in the instruction. Eg: I want to make twitter post about progress of my startup idea, do some office work for an hour and write the report for my paper. I have done abstract and background work and have the rest left. I have about 4 hours of work time available.
+## Database
+- [ ] Store user tasks in database
+- [ ] (**Post-MVP**) Store insights metadata, reflection reports in database
 
-Here it skips twitter.
+## AI Task Breakdown
+- [x] Fix why Gemini 1.5 flash doesnt breakdown all tasks and skips first task in the instruction. Eg: I want to make twitter post about progress of my startup idea, do some office work for an hour and write the report for my paper. I have done abstract and background work and have the rest left. I have about 4 hours of work time available.
+
+Here it skips twitter. (Reason was because my prompt was forcing to select 1 - 2 tasks only)
+
+- [ ] Have persistent memory of previous chats to model so model can take user follow up comments to refine instruction.
+- [ ] (Nice to have) In place text animations modifying the previous chat info istead of having AI respond new message. This might cause the chat Card view to get unnecessarily long and by allowing animations for in place edits, we can make it pretty looking. Likely need to provide previous plan if not able to resolve on its own from history.
+
+- [ ] Optimize checking from past chat history and whether there needs to be a context length limit.
+
+- [ ] Modify logic to either have model respond with follow up questions for better task breakdown or the task list along with a intro message on top. At the moment, I only parse out the json structure and pass that via .map() => format.
 
 - [ ] Use OpenAI model later (a cheaper one ideally)
+
+## UI/UX
+- [ ] Add appropriate back buttons between pages with slide back animations.
+- [ ] Fix UI issue where I hardcoded mt-4 and other fields. After adding navbar, now there is issue where everything is pushed down when there is sufficient spacing.
+
+- [ ] Implement Reflections page and its revelant UI design on paper first
+- [ ] Implement Insights page and its revelant UI design on paper first
+- [ ] Add slide right animation for pages that come after the current page and left for pages that come before. Eg: Task View to Reflections is slide right but the reverse is slide left animation.
+- [ ] Add consistent animation between pages
