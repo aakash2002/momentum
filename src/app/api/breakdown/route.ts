@@ -1,12 +1,29 @@
 import { NextResponse } from "next/server";
 import { taskCardArraySchema } from "@/lib/schemas/taskSchema";
 import systemPrompt from "@/lib/ai/systemPrompt";
-import type { TaskCardProps } from "@/types";
+import type { TaskCardProps, Subtask } from "@/types";
 
 const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 const API_KEY = process.env.API_KEY;
 
 type GeminiContent = { role: "user" | "model"; parts: { text: string }[] };
+
+export function normalizeTasks(rawTasks: unknown[]): TaskCardProps[] {
+  return (rawTasks as TaskCardProps[]).map((task): TaskCardProps => ({
+    ...task,
+    priority: task.priority
+      .trim()
+      .toLowerCase()
+      .replace(/^./, (c) => c.toUpperCase()) as TaskCardProps["priority"],
+    subtasks: task.subtasks.map((subtask): Subtask => ({
+      ...subtask,
+      status: subtask.status
+        .trim()
+        .toLowerCase()
+        .replace(" ", "_") as Subtask["status"],
+    })),
+  }));
+}
 
 export async function POST(req: Request) {
   if (!API_KEY) {
@@ -37,32 +54,46 @@ export async function POST(req: Request) {
     })
   });
 
-  const json = await response.json();
-  console.log("Gemini raw response:", json);
+  const data = await response.json();
+  const responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
-  const outputText = json.candidates?.[0]?.content?.parts?.[0]?.text;
-  console.log("Gemini output text:", outputText);
+  // console.log("Gemini Response:", responseText)
 
-  if (!outputText) {
-    return NextResponse.json({ error: "No valid text from Gemini." }, { status: 500 });
-  }
+  if (responseText.includes("json_start") && responseText.includes("json_end")) {
+    const introMessage = responseText.split("json_start")[0];
+    const jsonString = responseText.split("json_start")[1]?.split("json_end")[0]?.trim();
+      try {
+        // console.log("Intro message", introMessage);
+        // console.log("JSON string", jsonString);
+        const cleaned = jsonString
+    .replace(/```json/, "")
+    .replace(/```/, "")
+    .trim();
 
-  try {
-    const cleanText = outputText
-      .replace(/^[\s\S]*?({[\s\S]*})[\s\S]*$/, '$1') // extract only the JSON object
-      .replace(/```json|```/g, '') // remove markdown code blocks if present
+  // console.log("Cleaned JSON to parse:", cleaned);
 
-    console.log("🧹 Cleaned Gemini JSON string:", cleanText);
-
-    const parsed: unknown = JSON.parse(cleanText);
-    const validated = taskCardArraySchema.safeParse(parsed);
-    if (!validated.success) {
-      console.error("Zod validation errors:", validated.error.format());
-      return NextResponse.json({ error: "Invalid structure returned from Gemini." }, { status: 500 });
+      let parsedJson;
+      try {
+        parsedJson = JSON.parse(cleaned);
+      } catch (err) {
+        console.error("JSON.parse failed:", err);
+        return NextResponse.json({ error: "Parse error: Failed to parse JSON from response" }, { status: 400 });
+      }
+      // const normalized = normalizeTasks(parsedJson.tasks);
+      // const parsedTasks = taskCardArraySchema.parse(normalized);
+      return NextResponse.json({
+        type: "plan",
+        intro: introMessage.trim(),
+        tasks: parsedJson.tasks,
+      });
+    } catch (e) {
+      return NextResponse.json({ error: "Other error: Failed to parse JSON from response" }, { status: 400 });
     }
-    return NextResponse.json({ tasks: validated.data.tasks });
-  } catch (err) {
-    console.error("Validation error:", err);
-    return NextResponse.json({ error: "Invalid structure returned from Gemini." }, { status: 500 });
+  } else {
+    console.log("Asking clarification!");
+    return NextResponse.json({
+      type: "clarification",
+      content: responseText.trim(),
+    });
   }
 }

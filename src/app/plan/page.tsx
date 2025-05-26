@@ -16,6 +16,9 @@ import {Message, Subtask, TaskCardProps} from "@/types"
 import ChatMessage from "@/components/ChatMessage"
 import { NextResponse } from "next/server"
 
+type ParsedAIResponse =
+  | { type: "clarification"; content: string }
+  | { type: "plan"; intro: string; tasks: TaskCardProps[] };
 
 export default function AIBreakdown() {
     const [showChat, setShowChat] = useState(false)
@@ -48,7 +51,7 @@ export default function AIBreakdown() {
   const userMessage: Message = {
     id: nanoid(),
     role: "user",
-    content: text.trim()
+    content: text.trim(),
   };
 
   setMessages((prev) => [...prev, userMessage]);
@@ -61,30 +64,57 @@ export default function AIBreakdown() {
       body: JSON.stringify({ userInput: text.trim() })
     });
 
-    const data: { tasks: TaskCardProps[] } = await res.json();
-    console.log("AI Breakdown Response:", data);
+    const raw = await res.text();
+    console.log("Raw API response text:", raw);
 
-    if (!res.ok || !data.tasks) {
-      throw new Error("AI failed to return valid breakdown");
+    if (!res.ok) {
+      console.error("Non-OK response:", raw);
+      alert("Backend returned an error.");
+      return;
     }
 
-    const assistantMessages: Message[] = data.tasks.map(task => ({
-      id: nanoid(),
-      role: "assistant",
-      content: `📌 ${task.title}`,
-      confirmed: false,
-      editing: false,
-      subtasks: task.subtasks.map((subtask) => ({
-        ...subtask,
-        status: subtask.status as "todo" | "in_progress" | "done"
-      }))
-    }));
+    let data: ParsedAIResponse;
+    try {
+      data = JSON.parse(raw);
+    } catch (err) {
+      console.error("Failed to parse JSON:", err);
+      alert("Invalid response from server.");
+      return;
+    }
 
-    setMessages((prev) => [...prev, ...assistantMessages]);
+    if (data.type === "clarification") {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: nanoid(),
+          role: "assistant",
+          content: data.content,
+        },
+      ]);
+    } else if (data.type === "plan") {
+      const introMessage: Message = {
+        id: nanoid(),
+        role: "assistant",
+        content: data.intro,
+      };
 
+      const taskMessages: Message[] = data.tasks.map((task: TaskCardProps) => ({
+        id: nanoid(),
+        role: "assistant",
+        content: `${task.title}`,
+        confirmed: false,
+        editing: false,
+        subtasks: task.subtasks.map((subtask) => ({
+          ...subtask,
+          status: subtask.status as "todo" | "in_progress" | "done",
+        })),
+      }));
+
+      setMessages((prev) => [...prev, introMessage, ...taskMessages]);
+    }
   } catch (err) {
     console.error("Failed to get breakdown", err);
-    alert("Something went wrong generating tasks. Try again.");
+    alert("Something went wrong generating tasks.");
   }
 };
 
