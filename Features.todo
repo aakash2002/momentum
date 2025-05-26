@@ -4,14 +4,20 @@
 - [ ] Make posts on reddit, twitter and reply in comments building profile and presence for the app
 
 ## Authentication
-- [ ] Authenticate with Supabase DB
-- [ ] Once logged in, see how to not prompt login every time unless user logged out. See if some local file needs to be saved or not.
+- [x] Authenticate with Supabase DB
+- [ ] Ensure authentication is respected in other pages and only your user data is accessed. Verify the latter but implement the former if not done already.
+- [x] Once logged in, see how to not prompt login every time unless user logged out. See if some local file needs to be saved or not.
+
+## Security
+- [ ] Remove the alert and modify code to be production ready logging
+- [ ] In case of API call fail, render a message saying server unavailable or something in chat UI for user 'Planner' page.
+- [ ] Verify there aren't any possible backdoor attempts to extract sensitive data. Privatize important data and use getters/setters.
 
 ## Database
-- [ ] Store user tasks in database
-- [ ] (**Post-MVP**) Store insights metadata, reflection reports in database
+- [x] Store user tasks in database
 
 ## AI Task Breakdown
+- [ ] **(IMP) Fix why state data isn't cleared from past session. That is, chat keeps persistent memory from previous conversation and uses it.**
 - [x] Fix why Gemini 1.5 flash doesnt breakdown all tasks and skips first task in the instruction. Eg: I want to make twitter post about progress of my startup idea, do some office work for an hour and write the report for my paper. I have done abstract and background work and have the rest left. I have about 4 hours of work time available.
 
 Here it skips twitter. (Reason was because my prompt was forcing to select 1 - 2 tasks only)
@@ -28,13 +34,17 @@ Here it skips twitter. (Reason was because my prompt was forcing to select 1 - 2
 ## UI/UX
 - [ ] Add appropriate back buttons between pages with slide back animations.
 - [ ] Fix UI issue where I hardcoded mt-4 and other fields. After adding navbar, now there is issue where everything is pushed down when there is sufficient spacing.
+- [ ] **(IMP) Make email auth to redirect to the same window/desktop app instead of opening in new link**
+- [ ] **(IMP) Added tasks are added as backlog instead of today's tasks**
 
 - [ ] Implement Reflections page and its revelant UI design on paper first
 - [ ] Implement Insights page and its revelant UI design on paper first
 - [ ] Add slide right animation for pages that come after the current page and left for pages that come before. Eg: Task View to Reflections is slide right but the reverse is slide left animation.
 - [ ] Add consistent animation between pages
+- [ ] Fix UI in chat interface where trying to drag over and copy text when reaches first line it copies the heading hero text as well.
 
 ## Post MVP
 - [ ] Have a bubble icon for your AI chat assistant on tasks page in case you want to modify any tasks or have AI modify it for you so it dynamically updates it for you and users don't have to always go to the planner page to add tasks because there is a bit friction like click generate button before getting to chat interface. 
 - [ ] Ideally that plan should show up only once if no plan made and every other time if there is a task (even 1) in task view, then direclty on Planner tab show the chat view with slide left animation and show clear chat directly instead of having to click button
 - [ ] Add animation between messages from AI only
+- [ ] Store insights metadata, reflection reports in database

@@ -18,6 +18,8 @@ export type Message = {
   role: "user" | "assistant"
   content: string
   subtasks?: Subtask[]
+  tasks?: TaskCardProps[]
   confirmed?: boolean
   editing?: boolean
+  askToSchedule?: boolean;  // Track -- if reached the last subtask in plan, render the Ui button to schedule
 }

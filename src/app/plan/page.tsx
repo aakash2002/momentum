@@ -1,7 +1,7 @@
 'use client'
 
 // Components Import
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { nanoid } from "nanoid"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
@@ -14,36 +14,90 @@ import { motion, AnimatePresence } from 'framer-motion';
 // User-Defined Imports
 import {Message, Subtask, TaskCardProps} from "@/types"
 import ChatMessage from "@/components/ChatMessage"
-import { NextResponse } from "next/server"
+import { useChatStore } from "@/stores/ChatStores"
+import ScheduleSuccess from "@/components/ScheduleSuccess"
+import { saveTasksToSupabase } from "@/lib/utils";
+
 
 type ParsedAIResponse =
   | { type: "clarification"; content: string }
   | { type: "plan"; intro: string; tasks: TaskCardProps[] };
 
 export default function AIBreakdown() {
+    // Clear chat messages when navigating to this page
+   const clearMessages = useChatStore((s) => s.clearMessages)
+
+    useEffect(() => {
+      clearMessages()
+      console.log("Cleared chat on /ai mount")
+    }, [])
+
+    // Only show if plan is confirmed
+    const [showSuccess, setShowSuccess] = useState(false)
+
     const [showChat, setShowChat] = useState(false)
     const [text, setText] = useState("")
-    const [messages, setMessages] = useState<Message[]>([])
+    const messages = useChatStore((s) => s.messages)
+    const addMessage = useChatStore((s) => s.addMessage)
+    const updateMessage = useChatStore((s) => s.updateMessage)
+    const regenerateMessage = useChatStore((s) => s.regenerateMessage) // optional
 
     const handleConfirm = (id: string) => {
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === id ? { ...m, confirmed: true } : m
-      )
-    )
-  }
+        // Save tasks to database
+        const message = messages.find((m) => m.id === id);
 
-  const handleEdit = (id: string) => {
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === id ? { ...m, editing: true } : m
-      )
-    )
-  }
+        if (!message || !message.tasks || message.tasks.length === 0) {
+          console.warn("No tasks to save for message:", id);
+          return;
+        }
+        console.log("Saving tasks to DB");
+        saveTasksToSupabase(message.tasks)
 
-  const handleRegenerate = (id: string) => {
-    alert("Regenerate feature coming soon")
-  }
+        updateMessage(id, { confirmed: true, askToSchedule: false })
+        setShowSuccess(true)
+    };
+
+    const handleEdit = (id: string) => updateMessage(id, { editing: true });
+
+
+  const handleRegenerate = async (id: string) => {
+      const targetMessage = messages.find((m) => m.id === id);
+      if (!targetMessage) return;
+
+      regenerateMessage(id); // Optionally shows a "regenerating..." placeholder
+
+      const res = await fetch("/api/breakdown", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userInput: targetMessage.content }),
+      });
+
+      const raw = await res.text();
+
+      if (!res.ok) {
+        console.error("Error:", raw);
+        updateMessage(id, { content: "Failed to regenerate." });
+        return;
+      }
+
+      let data: ParsedAIResponse;
+      try {
+        data = JSON.parse(raw);
+      } catch (err) {
+        updateMessage(id, { content: "Parse error from server." });
+        return;
+      }
+
+      if (data.type === "plan") {
+        updateMessage(id, {
+          content: data.intro || targetMessage.content,
+          subtasks: data.tasks?.[0]?.subtasks ?? [],
+          confirmed: false,
+          editing: false,
+        });
+      }
+    };
+
 
   const handleSend = async () => {
   if (!text.trim()) return;
@@ -54,14 +108,26 @@ export default function AIBreakdown() {
     content: text.trim(),
   };
 
-  setMessages((prev) => [...prev, userMessage]);
+  addMessage(userMessage);
   setText("");
+
+  // Clear any previous askToSchedule flags
+  messages.forEach((msg) => {
+    if (msg.askToSchedule) {
+      updateMessage(msg.id, { askToSchedule: false });
+    }
+  });
+  // Add history to past messages
+  const geminiFormatted = [...messages, userMessage].map((m) => ({
+  role: m.role,
+  parts: [{ text: m.content }],
+  }));
 
   try {
     const res = await fetch("/api/breakdown", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userInput: text.trim() })
+      body: JSON.stringify({ messages: geminiFormatted })
     });
 
     const raw = await res.text();
@@ -83,35 +149,29 @@ export default function AIBreakdown() {
     }
 
     if (data.type === "clarification") {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: nanoid(),
-          role: "assistant",
-          content: data.content,
-        },
-      ]);
-    } else if (data.type === "plan") {
-      const introMessage: Message = {
+      addMessage({
         id: nanoid(),
         role: "assistant",
-        content: data.intro,
-      };
+        content: data.content,
+      });
+    } 
+    else if (data.type === "plan") {
+  const planMessage: Message = {
+    id: nanoid(),
+    role: "assistant",
+    content: data.intro, // e.g. "Sure! Here's your plan for the day:"
+    tasks: data.tasks.map((task) => ({
+      ...task,
+      subtasks: task.subtasks.map((subtask) => ({
+        ...subtask,
+        status: subtask.status as "todo" | "in_progress" | "done",
+      })),
+    })),
+    askToSchedule: true
+  };
 
-      const taskMessages: Message[] = data.tasks.map((task: TaskCardProps) => ({
-        id: nanoid(),
-        role: "assistant",
-        content: `${task.title}`,
-        confirmed: false,
-        editing: false,
-        subtasks: task.subtasks.map((subtask) => ({
-          ...subtask,
-          status: subtask.status as "todo" | "in_progress" | "done",
-        })),
-      }));
-
-      setMessages((prev) => [...prev, introMessage, ...taskMessages]);
-    }
+  addMessage(planMessage);
+}   
   } catch (err) {
     console.error("Failed to get breakdown", err);
     alert("Something went wrong generating tasks.");
@@ -168,7 +228,7 @@ return (
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 60 }}
             transition={{ delay: 0.2, duration: 0.5 }}
-            className="w-full max-w-2xl mx-auto mt-[20vh] flex flex-col"
+            className="w-full max-w-2xl mx-auto mt-[10vh] flex flex-col"
           >
             {/* Chat Messages Card */}
             <Card className="bg-white/5 border border-white/10 text-white shadow-xl overflow-hidden h-[400px]">
@@ -217,6 +277,7 @@ return (
           </motion.div>
         )}
       </AnimatePresence>
+      <ScheduleSuccess show={showSuccess} onClose={() => setShowSuccess(false)} />
     </div>
   );
 }

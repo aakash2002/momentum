@@ -46,8 +46,12 @@ export default function LandingScreen({
     >
       <Card className="w-full max-w-xl bg-white/5 border border-white/10 shadow-xl">
         <CardContent className="space-y-6 py-10 text-center">
-          <h1 className="text-4xl font-extrabold text-white drop-shadow-md mt-8">
+          {/* TODO: Remove this later once proper name and auth added */}
+          {/* <h1 className="text-4xl font-extrabold text-white drop-shadow-md mt-8">
             Welcome, {name}!
+          </h1> */}
+          <h1 className="text-4xl font-extrabold text-white drop-shadow-md mt-8">
+            Welcome!
           </h1>
 
           <AnimatePresence mode="wait">

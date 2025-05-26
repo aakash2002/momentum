@@ -31,20 +31,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing API Key" }, { status: 500 });
   }
 
-  const { userInput } = await req.json();
-
-  const messages: GeminiContent[] = [
-    {
-      role: "user",
-      parts: [{ text: systemPrompt + "\n\n" + userInput }]
-    }
-  ];
+  const { messages } = await req.json(); // contains full chat history so far from client
 
   const response = await fetch(`${API_URL}?key=${API_KEY}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: messages,
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: systemPrompt }],
+        },
+        ...messages
+      ],
       generationConfig: {
         temperature: 0.4,
         topK: 32,
@@ -54,10 +53,11 @@ export async function POST(req: Request) {
     })
   });
 
+
   const data = await response.json();
   const responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
-  // console.log("Gemini Response:", responseText)
+  console.log("Gemini Response:", responseText)
 
   if (responseText.includes("json_start") && responseText.includes("json_end")) {
     const introMessage = responseText.split("json_start")[0];
