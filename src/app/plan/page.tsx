@@ -123,6 +123,8 @@ export default function AIBreakdown() {
   parts: [{ text: m.content }],
   }));
 
+  console.log("Gemini Payload:", geminiFormatted);
+
   try {
     const res = await fetch("/api/breakdown", {
       method: "POST",
