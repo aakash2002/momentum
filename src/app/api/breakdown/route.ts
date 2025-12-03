@@ -3,7 +3,7 @@ import { taskCardArraySchema } from "@/lib/schemas/taskSchema";
 import systemPrompt from "@/lib/ai/systemPrompt";
 import type { TaskCardProps, Subtask } from "@/types";
 
-const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 const API_KEY = process.env.API_KEY;
 
 type GeminiContent = { role: "user" | "model"; parts: { text: string }[] };
@@ -33,7 +33,16 @@ export async function POST(req: Request) {
 
   const { messages } = await req.json(); // contains full chat history so far from client
 
-  const response = await fetch(`${API_URL}?key=${API_KEY}`, {
+  try {
+    // Map "assistant" role to "model" for Gemini API compatibility
+    const geminiMessages = messages.map((msg: any) => ({
+      role: msg.role === "assistant" ? "model" : msg.role,
+      parts: msg.parts,
+    }));
+
+    console.log("Formatted messages for Gemini:", JSON.stringify(geminiMessages, null, 2));
+
+    const response = await fetch(`${API_URL}?key=${API_KEY}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -42,22 +51,79 @@ export async function POST(req: Request) {
           role: "user",
           parts: [{ text: systemPrompt }],
         },
-        ...messages
+        ...geminiMessages
       ],
       generationConfig: {
         temperature: 0.4,
         topK: 32,
         topP: 1,
-        maxOutputTokens: 1024
+        maxOutputTokens: 10000
       }
     })
   });
 
 
-  const data = await response.json();
-  const responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  if (!response.ok) {
+    const errorData = await response.text();
+    console.error("Gemini API error:", response.status, errorData);
+    return NextResponse.json({ 
+      error: `Gemini API error: ${response.status}`,
+      details: errorData,
+      type: "clarification",
+      content: "I'm sorry, there was an error processing your request. Please try again."
+    }, { status: response.status });
+  }
 
-  console.log("Gemini Response:", responseText)
+  const data = await response.json();
+  console.log("Full Gemini API response:", JSON.stringify(data, null, 2));
+
+  // Check for errors in the response
+  if (data.error) {
+    console.error("Gemini API returned error:", data.error);
+    return NextResponse.json({ 
+      error: data.error.message || "Gemini API error",
+      details: data.error,
+      type: "clarification",
+      content: "I'm sorry, there was an error processing your request. Please try again."
+    }, { status: 400 });
+  }
+
+  // Check if candidates exist
+  if (!data.candidates || data.candidates.length === 0) {
+    console.error("No candidates in Gemini response:", data);
+    return NextResponse.json({ 
+      error: "No response from Gemini",
+      details: data,
+      type: "clarification",
+      content: "I'm sorry, I didn't receive a response. Please try again."
+    }, { status: 400 });
+  }
+
+  // Check if content exists
+  const candidate = data.candidates[0];
+  if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
+    console.error("No content in Gemini candidate:", candidate);
+    return NextResponse.json({ 
+      error: "Empty response from Gemini",
+      details: candidate,
+      type: "clarification",
+      content: "I'm sorry, I received an empty response. Please try again."
+    }, { status: 400 });
+  }
+
+  const responseText = candidate.content.parts[0]?.text ?? "";
+
+  console.log("Gemini Response Text:", responseText);
+  console.log("Response Text Length:", responseText.length);
+
+  if (!responseText || responseText.trim().length === 0) {
+    console.error("Empty response text from Gemini");
+    return NextResponse.json({ 
+      error: "Empty response from Gemini",
+      type: "clarification",
+      content: "I'm sorry, I didn't receive a proper response. Could you please rephrase your request?"
+    }, { status: 200 });
+  }
 
   if (responseText.includes("json_start") && responseText.includes("json_end")) {
     const introMessage = responseText.split("json_start")[0];
@@ -95,5 +161,14 @@ export async function POST(req: Request) {
       type: "clarification",
       content: responseText.trim(),
     });
+  }
+  } catch (error) {
+    console.error("Error calling Gemini API:", error);
+    return NextResponse.json({ 
+      error: "Failed to call Gemini API",
+      details: error instanceof Error ? error.message : String(error),
+      type: "clarification",
+      content: "I'm sorry, there was an error processing your request. Please try again."
+    }, { status: 500 });
   }
 }
